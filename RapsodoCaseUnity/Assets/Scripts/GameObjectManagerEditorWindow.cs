@@ -35,6 +35,7 @@ public class GameObjectManager : EditorWindow
 
     private void OnGUI()
     {  
+        // GameObject listesini çizdirme
         EditorGUILayout.LabelField("GameObject List", EditorStyles.boldLabel);
         EditorGUILayout.Space();
         EditorGUILayout.BeginVertical("box");
@@ -65,10 +66,10 @@ public class GameObjectManager : EditorWindow
             }
         }
         EditorGUILayout.EndScrollView();
-        
         EditorGUILayout.EndVertical();
         EditorGUILayout.Space();
         
+        // Seçili objelerin transform değerlerini düzenleme
         if (_selectedObjects.Count > 0)
         {
             EditorGUILayout.LabelField("Edit Selected GameObjects", EditorStyles.boldLabel);
@@ -76,27 +77,82 @@ public class GameObjectManager : EditorWindow
             
             DetermineCommonTransformValues();
 
-            // Pozisyon
-            EditorGUI.showMixedValue = _positionMixed[0] || _positionMixed[1] || _positionMixed[2];
-            Vector3 newPosition = EditorGUILayout.Vector3Field("Position", _position);
+            // Pozisyon 
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Position", GUILayout.Width(70));
+            float oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 15;
+
+            EditorGUI.showMixedValue = _positionMixed[0];
+            float newPosX = EditorGUILayout.FloatField("X", _position.x, GUILayout.Width(60));
             EditorGUI.showMixedValue = false;
 
-            // Rotasyon
-            EditorGUI.showMixedValue = _rotationMixed[0] || _rotationMixed[1] || _rotationMixed[2];
-            Vector3 newRotation = EditorGUILayout.Vector3Field("Rotation", _rotation);
+            EditorGUI.showMixedValue = _positionMixed[1];
+            float newPosY = EditorGUILayout.FloatField("Y", _position.y, GUILayout.Width(60));
             EditorGUI.showMixedValue = false;
 
-            // Ölçek
-            EditorGUI.showMixedValue = _scaleMixed[0] || _scaleMixed[1] || _scaleMixed[2];
-            Vector3 newScale = EditorGUILayout.Vector3Field("Scale", _scale);
+            EditorGUI.showMixedValue = _positionMixed[2];
+            float newPosZ = EditorGUILayout.FloatField("Z", _position.z, GUILayout.Width(60));
             EditorGUI.showMixedValue = false;
+
+            EditorGUIUtility.labelWidth = oldLabelWidth;
+            EditorGUILayout.EndHorizontal();
+            Vector3 newPosition = new Vector3(newPosX, newPosY, newPosZ);
+
+            // Rotasyon 
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Rotation", GUILayout.Width(70));
+            oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 15;
+
+            EditorGUI.showMixedValue = _rotationMixed[0];
+            float newRotX = EditorGUILayout.FloatField("X", _rotation.x, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUI.showMixedValue = _rotationMixed[1];
+            float newRotY = EditorGUILayout.FloatField("Y", _rotation.y, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUI.showMixedValue = _rotationMixed[2];
+            float newRotZ = EditorGUILayout.FloatField("Z", _rotation.z, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUIUtility.labelWidth = oldLabelWidth;
+            EditorGUILayout.EndHorizontal();
+            Vector3 newRotation = new Vector3(newRotX, newRotY, newRotZ);
+
+            // Scale 
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Scale", GUILayout.Width(70));
+            oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 15;
+
+            EditorGUI.showMixedValue = _scaleMixed[0];
+            float newScaleX = EditorGUILayout.FloatField("X", _scale.x, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUI.showMixedValue = _scaleMixed[1];
+            float newScaleY = EditorGUILayout.FloatField("Y", _scale.y, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUI.showMixedValue = _scaleMixed[2];
+            float newScaleZ = EditorGUILayout.FloatField("Z", _scale.z, GUILayout.Width(60));
+            EditorGUI.showMixedValue = false;
+
+            EditorGUIUtility.labelWidth = oldLabelWidth;
+            EditorGUILayout.EndHorizontal();
+            Vector3 newScale = new Vector3(newScaleX, newScaleY, newScaleZ);
             
+            // Transform değerlerini uygulama
             foreach (var obj in _selectedObjects)
             {
                 Undo.RecordObject(obj.transform, "Modify Transform");
-                if (newPosition != _position) obj.transform.position += newPosition - _position;
-                if (newRotation != _rotation) obj.transform.eulerAngles += newRotation - _rotation;
-                if (newScale != _scale) obj.transform.localScale += newScale - _scale;
+                if (newPosition != _position) 
+                    obj.transform.position += newPosition - _position;
+                if (newRotation != _rotation) 
+                    obj.transform.eulerAngles += newRotation - _rotation;
+                if (newScale != _scale) 
+                    obj.transform.localScale += newScale - _scale;
             }
             
             EditorGUILayout.EndVertical();
@@ -121,13 +177,16 @@ public class GameObjectManager : EditorWindow
 
     private void RefreshGameObjects()
     {
-        _gameObjects = Resources.FindObjectsOfTypeAll<GameObject>().Where(obj => obj.hideFlags == HideFlags.None).ToList();
+        _gameObjects = Resources.FindObjectsOfTypeAll<GameObject>()
+                        .Where(obj => obj.hideFlags == HideFlags.None)
+                        .ToList();
         _lastObjectCount = _gameObjects.Count;
     }
 
     private void AutoRefresh()
     {
-        int currentCount = Resources.FindObjectsOfTypeAll<GameObject>().Count(obj => obj.hideFlags == HideFlags.None);
+        int currentCount = Resources.FindObjectsOfTypeAll<GameObject>()
+                            .Count(obj => obj.hideFlags == HideFlags.None);
         if (currentCount != _lastObjectCount)
         {
             RefreshGameObjects();

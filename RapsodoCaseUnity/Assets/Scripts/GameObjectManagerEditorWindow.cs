@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEditor;
+using System;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -39,7 +41,7 @@ public class GameObjectManager : EditorWindow
         EditorGUILayout.LabelField("GameObject List", EditorStyles.boldLabel);
         EditorGUILayout.Space();
         EditorGUILayout.BeginVertical("box");
-        
+
         _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
         foreach (var obj in _gameObjects)
         {
@@ -68,13 +70,13 @@ public class GameObjectManager : EditorWindow
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
         EditorGUILayout.Space();
-        
+
         // Seçili objelerin transform değerlerini düzenleme
         if (_selectedObjects.Count > 0)
         {
             EditorGUILayout.LabelField("Edit Selected GameObjects", EditorStyles.boldLabel);
             EditorGUILayout.BeginVertical("box");
-            
+
             DetermineCommonTransformValues();
 
             // Pozisyon 
@@ -142,36 +144,127 @@ public class GameObjectManager : EditorWindow
             EditorGUIUtility.labelWidth = oldLabelWidth;
             EditorGUILayout.EndHorizontal();
             Vector3 newScale = new Vector3(newScaleX, newScaleY, newScaleZ);
-            
-            // Transform değerlerini uygulama
+
+            // Transform değerlerini uygulama (relative değişim)
             foreach (var obj in _selectedObjects)
             {
                 Undo.RecordObject(obj.transform, "Modify Transform");
-                if (newPosition != _position) 
+                if (newPosition != _position)
                     obj.transform.position += newPosition - _position;
-                if (newRotation != _rotation) 
+                if (newRotation != _rotation)
                     obj.transform.eulerAngles += newRotation - _rotation;
-                if (newScale != _scale) 
+                if (newScale != _scale)
                     obj.transform.localScale += newScale - _scale;
             }
-            
+
             EditorGUILayout.EndVertical();
+
+            // Component Ekleme / Çıkarma Bölümü - Dropdown menü ile
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Add/Remove Component", EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Add Component", GUILayout.Width(120)))
+            {
+                GenericMenu menu = new GenericMenu();
+                foreach (Type type in GetAllComponentTypes())
+                {
+                    menu.AddItem(new GUIContent(type.Name), false, () => AddComponentToSelected(type));
+                }
+                menu.ShowAsContext();
+            }
+            if (GUILayout.Button("Remove Component", GUILayout.Width(120)))
+            {
+                GenericMenu menu = new GenericMenu();
+                // Seçili objelerde bulunan ve Transform dışındaki component tiplerini listeleyelim
+                HashSet<Type> compTypes = new HashSet<Type>();
+                foreach (var obj in _selectedObjects)
+                {
+                    foreach (Component comp in obj.GetComponents<Component>())
+                    {
+                        if (!(comp is Transform))
+                            compTypes.Add(comp.GetType());
+                    }
+                }
+                List<Type> compList = compTypes.ToList();
+                compList.Sort((x, y) => x.Name.CompareTo(y.Name));
+                foreach (Type type in compList)
+                {
+                    menu.AddItem(new GUIContent(type.Name), false, () => RemoveComponentFromSelected(type));
+                }
+                menu.ShowAsContext();
+            }
+            EditorGUILayout.EndHorizontal();
         }
     }
 
     private void DetermineCommonTransformValues()
     {
-        if (_selectedObjects.Count == 0) return;
-        
+        if (_selectedObjects.Count == 0)
+            return;
+
         _position = _selectedObjects[0].transform.position;
         _rotation = _selectedObjects[0].transform.eulerAngles;
         _scale = _selectedObjects[0].transform.localScale;
-        
+
         for (int i = 0; i < 3; i++)
         {
             _positionMixed[i] = _selectedObjects.Any(o => !Mathf.Approximately(o.transform.position[i], _position[i]));
             _rotationMixed[i] = _selectedObjects.Any(o => !Mathf.Approximately(o.transform.eulerAngles[i], _rotation[i]));
             _scaleMixed[i] = _selectedObjects.Any(o => !Mathf.Approximately(o.transform.localScale[i], _scale[i]));
+        }
+    }
+
+    // Tüm yüklü assembly'lerden, Component türevleri (soyut olmayan ve public olanlar) toplanıyor
+    private static List<Type> _allComponentTypes;
+    private static List<Type> GetAllComponentTypes()
+    {
+        if (_allComponentTypes == null)
+        {
+            _allComponentTypes = new List<Type>();
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch
+                {
+                    continue;
+                }
+                foreach (Type type in types)
+                {
+                    if (typeof(Component).IsAssignableFrom(type) && !type.IsAbstract && type.IsPublic)
+                    {
+                        _allComponentTypes.Add(type);
+                    }
+                }
+            }
+            _allComponentTypes.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
+        }
+        return _allComponentTypes;
+    }
+
+    private void AddComponentToSelected(Type type)
+    {
+        foreach (var obj in _selectedObjects)
+        {
+            if (obj.GetComponent(type) == null)
+            {
+                Undo.AddComponent(obj, type);
+            }
+        }
+    }
+
+    private void RemoveComponentFromSelected(Type type)
+    {
+        foreach (var obj in _selectedObjects)
+        {
+            Component comp = obj.GetComponent(type);
+            if (comp != null)
+            {
+                Undo.DestroyObjectImmediate(comp);
+            }
         }
     }
 

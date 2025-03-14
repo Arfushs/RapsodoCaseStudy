@@ -12,6 +12,7 @@ public class GameObjectManager : EditorWindow
     private int _lastObjectCount;
     private List<GameObject> _selectedObjects = new List<GameObject>();
 
+    // Editing Tranform variables
     private Vector3 _position;
     private Vector3 _rotation;
     private Vector3 _scale;
@@ -20,9 +21,10 @@ public class GameObjectManager : EditorWindow
     private bool[] _scaleMixed = new bool[3];
 
     // Filtering options
-    private bool filterMeshRenderer;
-    private bool filterCollider;
-    private bool filterRigidbody;
+    private bool _filterMeshRenderer;
+    private bool _filterCollider;
+    private bool _filterRigidbody;
+    private string _searchQuery = "";
 
     [MenuItem("Tools/GameObject Manager")]
     public static void ShowWindow()
@@ -43,6 +45,7 @@ public class GameObjectManager : EditorWindow
 
     private void OnGUI()
     {
+        DrawSearchOptions();
         DrawFilteringOptions();
         DrawGameObjectList();
         EditorGUILayout.Space();
@@ -58,10 +61,16 @@ public class GameObjectManager : EditorWindow
     private void DrawFilteringOptions()
     {
         EditorGUILayout.LabelField("Filtering Options", EditorStyles.boldLabel);
-        filterMeshRenderer = EditorGUILayout.Toggle("Mesh Renderer", filterMeshRenderer);
-        filterCollider = EditorGUILayout.Toggle("Collider", filterCollider);
-        filterRigidbody = EditorGUILayout.Toggle("Rigidbody", filterRigidbody);
+        _filterMeshRenderer = EditorGUILayout.Toggle("Mesh Renderer", _filterMeshRenderer);
+        _filterCollider = EditorGUILayout.Toggle("Collider", _filterCollider);
+        _filterRigidbody = EditorGUILayout.Toggle("Rigidbody", _filterRigidbody);
         EditorGUILayout.Space();
+    }
+
+    private void DrawSearchOptions()
+    {
+        EditorGUILayout.LabelField("Search Options", EditorStyles.boldLabel);
+        _searchQuery = EditorGUILayout.TextField("Search", _searchQuery);
     }
 
     private void DrawGameObjectList()
@@ -74,18 +83,22 @@ public class GameObjectManager : EditorWindow
 
         foreach (var obj in _gameObjects)
         {
-            // Filtreleme: Eğer ilgili filter aktifse ve obje istenen component'e sahip değilse, atla.
-            if (filterMeshRenderer && obj.GetComponent<MeshRenderer>() == null)
+            // Filtering: If the corresponding filter is active and the object does not have the required component, skip.
+            if (_filterMeshRenderer && obj.GetComponent<MeshRenderer>() == null)
                 continue;
-            if (filterCollider && obj.GetComponent<Collider>() == null)
+            if (_filterCollider && obj.GetComponent<Collider>() == null)
                 continue;
-            if (filterRigidbody && obj.GetComponent<Rigidbody>() == null)
+            if (_filterRigidbody && obj.GetComponent<Rigidbody>() == null)
+                continue;
+            // Search filter: If the search query is not empty and the object name does not contain it, skip.
+            if (!string.IsNullOrEmpty(_searchQuery) &&
+                obj.name.IndexOf(_searchQuery, StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
 
             if (obj != null)
             {
                 EditorGUILayout.BeginHorizontal("box");
-                // Durum bilgisi
+                // State information
                 if (!obj.activeSelf)
                     EditorGUILayout.LabelField("Disabled", EditorStyles.boldLabel, GUILayout.Width(120));
                 else
@@ -98,7 +111,7 @@ public class GameObjectManager : EditorWindow
                     obj.SetActive(newState);
                 }
 
-                // Seçim işlemi
+                // Selection handling
                 bool isSelected = _selectedObjects.Contains(obj);
                 if (GUILayout.Toggle(isSelected, obj.name, "Button", GUILayout.Width(200)))
                 {
@@ -123,7 +136,7 @@ public class GameObjectManager : EditorWindow
 
         DetermineCommonTransformValues();
 
-        // Pozisyon
+        // Position
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Position", GUILayout.Width(70));
         float oldLabelWidth = EditorGUIUtility.labelWidth;
@@ -145,7 +158,7 @@ public class GameObjectManager : EditorWindow
         EditorGUILayout.EndHorizontal();
         Vector3 newPosition = new Vector3(newPosX, newPosY, newPosZ);
 
-        // Rotasyon
+        // Rotation
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Rotation", GUILayout.Width(70));
         oldLabelWidth = EditorGUIUtility.labelWidth;
@@ -189,7 +202,7 @@ public class GameObjectManager : EditorWindow
         EditorGUILayout.EndHorizontal();
         Vector3 newScale = new Vector3(newScaleX, newScaleY, newScaleZ);
 
-        // Değişiklikleri uygulama (relative değişim)
+        // Apply changes (relative modification)
         foreach (var obj in _selectedObjects)
         {
             Undo.RecordObject(obj.transform, "Modify Transform");
@@ -221,7 +234,7 @@ public class GameObjectManager : EditorWindow
         if (GUILayout.Button("Remove Component", GUILayout.Width(120)))
         {
             GenericMenu menu = new GenericMenu();
-            // Seçili objelerde bulunan (Transform hariç) component tiplerini listele
+            // List the component types (excluding Transform) present in the selected objects
             HashSet<Type> compTypes = new HashSet<Type>();
             foreach (var obj in _selectedObjects)
             {
@@ -259,7 +272,7 @@ public class GameObjectManager : EditorWindow
         }
     }
 
-    // Component tiplerini tüm assembly'lerden toplar (soyut olmayan, public)
+    // Collects component types from all loaded assemblies (non-abstract, public)
     private static List<Type> _allComponentTypes;
     private static List<Type> GetAllComponentTypes()
     {

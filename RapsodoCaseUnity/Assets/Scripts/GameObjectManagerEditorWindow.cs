@@ -11,12 +11,18 @@ public class GameObjectManager : EditorWindow
     private Vector2 _scrollPos;
     private int _lastObjectCount;
     private List<GameObject> _selectedObjects = new List<GameObject>();
+
     private Vector3 _position;
     private Vector3 _rotation;
     private Vector3 _scale;
     private bool[] _positionMixed = new bool[3];
     private bool[] _rotationMixed = new bool[3];
     private bool[] _scaleMixed = new bool[3];
+
+    // Filtering options
+    private bool filterMeshRenderer;
+    private bool filterCollider;
+    private bool filterRigidbody;
 
     [MenuItem("Tools/GameObject Manager")]
     public static void ShowWindow()
@@ -36,24 +42,63 @@ public class GameObjectManager : EditorWindow
     }
 
     private void OnGUI()
-    {  
-        // GameObject listesini çizdirme
+    {
+        DrawFilteringOptions();
+        DrawGameObjectList();
+        EditorGUILayout.Space();
+
+        if (_selectedObjects.Count > 0)
+        {
+            DrawTransformEditor();
+            EditorGUILayout.Space();
+            DrawComponentEditor();
+        }
+    }
+
+    private void DrawFilteringOptions()
+    {
+        EditorGUILayout.LabelField("Filtering Options", EditorStyles.boldLabel);
+        filterMeshRenderer = EditorGUILayout.Toggle("Mesh Renderer", filterMeshRenderer);
+        filterCollider = EditorGUILayout.Toggle("Collider", filterCollider);
+        filterRigidbody = EditorGUILayout.Toggle("Rigidbody", filterRigidbody);
+        EditorGUILayout.Space();
+    }
+
+    private void DrawGameObjectList()
+    {
         EditorGUILayout.LabelField("GameObject List", EditorStyles.boldLabel);
         EditorGUILayout.Space();
-        EditorGUILayout.BeginVertical("box");
 
+        EditorGUILayout.BeginVertical("box");
         _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
+
         foreach (var obj in _gameObjects)
         {
+            // Filtreleme: Eğer ilgili filter aktifse ve obje istenen component'e sahip değilse, atla.
+            if (filterMeshRenderer && obj.GetComponent<MeshRenderer>() == null)
+                continue;
+            if (filterCollider && obj.GetComponent<Collider>() == null)
+                continue;
+            if (filterRigidbody && obj.GetComponent<Rigidbody>() == null)
+                continue;
+
             if (obj != null)
             {
                 EditorGUILayout.BeginHorizontal("box");
+                // Durum bilgisi
+                if (!obj.activeSelf)
+                    EditorGUILayout.LabelField("Disabled", EditorStyles.boldLabel, GUILayout.Width(120));
+                else
+                    EditorGUILayout.LabelField("Enabled", EditorStyles.boldLabel, GUILayout.Width(120));
+
                 bool newState = EditorGUILayout.Toggle(obj.activeSelf, GUILayout.Width(20));
                 if (newState != obj.activeSelf)
                 {
                     Undo.RecordObject(obj, "Toggle Active State");
                     obj.SetActive(newState);
                 }
+
+                // Seçim işlemi
                 bool isSelected = _selectedObjects.Contains(obj);
                 if (GUILayout.Toggle(isSelected, obj.name, "Button", GUILayout.Width(200)))
                 {
@@ -69,132 +114,132 @@ public class GameObjectManager : EditorWindow
         }
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
-        EditorGUILayout.Space();
+    }
 
-        // Seçili objelerin transform değerlerini düzenleme
-        if (_selectedObjects.Count > 0)
+    private void DrawTransformEditor()
+    {
+        EditorGUILayout.LabelField("Edit Selected GameObjects", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box");
+
+        DetermineCommonTransformValues();
+
+        // Pozisyon
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Position", GUILayout.Width(70));
+        float oldLabelWidth = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 15;
+
+        EditorGUI.showMixedValue = _positionMixed[0];
+        float newPosX = EditorGUILayout.FloatField("X", _position.x, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _positionMixed[1];
+        float newPosY = EditorGUILayout.FloatField("Y", _position.y, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _positionMixed[2];
+        float newPosZ = EditorGUILayout.FloatField("Z", _position.z, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUIUtility.labelWidth = oldLabelWidth;
+        EditorGUILayout.EndHorizontal();
+        Vector3 newPosition = new Vector3(newPosX, newPosY, newPosZ);
+
+        // Rotasyon
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Rotation", GUILayout.Width(70));
+        oldLabelWidth = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 15;
+
+        EditorGUI.showMixedValue = _rotationMixed[0];
+        float newRotX = EditorGUILayout.FloatField("X", _rotation.x, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _rotationMixed[1];
+        float newRotY = EditorGUILayout.FloatField("Y", _rotation.y, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _rotationMixed[2];
+        float newRotZ = EditorGUILayout.FloatField("Z", _rotation.z, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUIUtility.labelWidth = oldLabelWidth;
+        EditorGUILayout.EndHorizontal();
+        Vector3 newRotation = new Vector3(newRotX, newRotY, newRotZ);
+
+        // Scale
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("Scale", GUILayout.Width(70));
+        oldLabelWidth = EditorGUIUtility.labelWidth;
+        EditorGUIUtility.labelWidth = 15;
+
+        EditorGUI.showMixedValue = _scaleMixed[0];
+        float newScaleX = EditorGUILayout.FloatField("X", _scale.x, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _scaleMixed[1];
+        float newScaleY = EditorGUILayout.FloatField("Y", _scale.y, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUI.showMixedValue = _scaleMixed[2];
+        float newScaleZ = EditorGUILayout.FloatField("Z", _scale.z, GUILayout.Width(60));
+        EditorGUI.showMixedValue = false;
+
+        EditorGUIUtility.labelWidth = oldLabelWidth;
+        EditorGUILayout.EndHorizontal();
+        Vector3 newScale = new Vector3(newScaleX, newScaleY, newScaleZ);
+
+        // Değişiklikleri uygulama (relative değişim)
+        foreach (var obj in _selectedObjects)
         {
-            EditorGUILayout.LabelField("Edit Selected GameObjects", EditorStyles.boldLabel);
-            EditorGUILayout.BeginVertical("box");
+            Undo.RecordObject(obj.transform, "Modify Transform");
+            if (newPosition != _position)
+                obj.transform.position += newPosition - _position;
+            if (newRotation != _rotation)
+                obj.transform.eulerAngles += newRotation - _rotation;
+            if (newScale != _scale)
+                obj.transform.localScale += newScale - _scale;
+        }
 
-            DetermineCommonTransformValues();
+        EditorGUILayout.EndVertical();
+    }
 
-            // Pozisyon 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Position", GUILayout.Width(70));
-            float oldLabelWidth = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = 15;
+    private void DrawComponentEditor()
+    {
+        EditorGUILayout.LabelField("Add/Remove Component", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
 
-            EditorGUI.showMixedValue = _positionMixed[0];
-            float newPosX = EditorGUILayout.FloatField("X", _position.x, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _positionMixed[1];
-            float newPosY = EditorGUILayout.FloatField("Y", _position.y, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _positionMixed[2];
-            float newPosZ = EditorGUILayout.FloatField("Z", _position.z, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUIUtility.labelWidth = oldLabelWidth;
-            EditorGUILayout.EndHorizontal();
-            Vector3 newPosition = new Vector3(newPosX, newPosY, newPosZ);
-
-            // Rotasyon 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Rotation", GUILayout.Width(70));
-            oldLabelWidth = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = 15;
-
-            EditorGUI.showMixedValue = _rotationMixed[0];
-            float newRotX = EditorGUILayout.FloatField("X", _rotation.x, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _rotationMixed[1];
-            float newRotY = EditorGUILayout.FloatField("Y", _rotation.y, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _rotationMixed[2];
-            float newRotZ = EditorGUILayout.FloatField("Z", _rotation.z, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUIUtility.labelWidth = oldLabelWidth;
-            EditorGUILayout.EndHorizontal();
-            Vector3 newRotation = new Vector3(newRotX, newRotY, newRotZ);
-
-            // Scale 
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Scale", GUILayout.Width(70));
-            oldLabelWidth = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = 15;
-
-            EditorGUI.showMixedValue = _scaleMixed[0];
-            float newScaleX = EditorGUILayout.FloatField("X", _scale.x, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _scaleMixed[1];
-            float newScaleY = EditorGUILayout.FloatField("Y", _scale.y, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUI.showMixedValue = _scaleMixed[2];
-            float newScaleZ = EditorGUILayout.FloatField("Z", _scale.z, GUILayout.Width(60));
-            EditorGUI.showMixedValue = false;
-
-            EditorGUIUtility.labelWidth = oldLabelWidth;
-            EditorGUILayout.EndHorizontal();
-            Vector3 newScale = new Vector3(newScaleX, newScaleY, newScaleZ);
-
-            // Transform değerlerini uygulama (relative değişim)
+        if (GUILayout.Button("Add Component", GUILayout.Width(120)))
+        {
+            GenericMenu menu = new GenericMenu();
+            foreach (Type type in GetAllComponentTypes())
+            {
+                menu.AddItem(new GUIContent(type.Name), false, () => AddComponentToSelected(type));
+            }
+            menu.ShowAsContext();
+        }
+        if (GUILayout.Button("Remove Component", GUILayout.Width(120)))
+        {
+            GenericMenu menu = new GenericMenu();
+            // Seçili objelerde bulunan (Transform hariç) component tiplerini listele
+            HashSet<Type> compTypes = new HashSet<Type>();
             foreach (var obj in _selectedObjects)
             {
-                Undo.RecordObject(obj.transform, "Modify Transform");
-                if (newPosition != _position)
-                    obj.transform.position += newPosition - _position;
-                if (newRotation != _rotation)
-                    obj.transform.eulerAngles += newRotation - _rotation;
-                if (newScale != _scale)
-                    obj.transform.localScale += newScale - _scale;
+                foreach (Component comp in obj.GetComponents<Component>())
+                {
+                    if (!(comp is Transform))
+                        compTypes.Add(comp.GetType());
+                }
             }
-
-            EditorGUILayout.EndVertical();
-
-            // Component Ekleme / Çıkarma Bölümü - Dropdown menü ile
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Add/Remove Component", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Add Component", GUILayout.Width(120)))
+            List<Type> compList = compTypes.ToList();
+            compList.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
+            foreach (Type type in compList)
             {
-                GenericMenu menu = new GenericMenu();
-                foreach (Type type in GetAllComponentTypes())
-                {
-                    menu.AddItem(new GUIContent(type.Name), false, () => AddComponentToSelected(type));
-                }
-                menu.ShowAsContext();
+                menu.AddItem(new GUIContent(type.Name), false, () => RemoveComponentFromSelected(type));
             }
-            if (GUILayout.Button("Remove Component", GUILayout.Width(120)))
-            {
-                GenericMenu menu = new GenericMenu();
-                // Seçili objelerde bulunan ve Transform dışındaki component tiplerini listeleyelim
-                HashSet<Type> compTypes = new HashSet<Type>();
-                foreach (var obj in _selectedObjects)
-                {
-                    foreach (Component comp in obj.GetComponents<Component>())
-                    {
-                        if (!(comp is Transform))
-                            compTypes.Add(comp.GetType());
-                    }
-                }
-                List<Type> compList = compTypes.ToList();
-                compList.Sort((x, y) => x.Name.CompareTo(y.Name));
-                foreach (Type type in compList)
-                {
-                    menu.AddItem(new GUIContent(type.Name), false, () => RemoveComponentFromSelected(type));
-                }
-                menu.ShowAsContext();
-            }
-            EditorGUILayout.EndHorizontal();
+            menu.ShowAsContext();
         }
+        EditorGUILayout.EndHorizontal();
     }
 
     private void DetermineCommonTransformValues()
@@ -214,7 +259,7 @@ public class GameObjectManager : EditorWindow
         }
     }
 
-    // Tüm yüklü assembly'lerden, Component türevleri (soyut olmayan ve public olanlar) toplanıyor
+    // Component tiplerini tüm assembly'lerden toplar (soyut olmayan, public)
     private static List<Type> _allComponentTypes;
     private static List<Type> GetAllComponentTypes()
     {
